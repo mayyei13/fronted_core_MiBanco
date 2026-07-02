@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="MiBanco">
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#009b3a"/>
+  <circle cx="16" cy="24" r="8" fill="#ffd21c"/>
+  <path d="M13 29V19l4 6 4-6v10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
