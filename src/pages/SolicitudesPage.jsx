@@ -19,6 +19,9 @@ export default function SolicitudesPage() {
   const [error, setError] = useState(null)
   const [ok, setOk] = useState(null)
   const [savingAction, setSavingAction] = useState(null)
+  const [decisionById, setDecisionById] = useState({})
+  const [desembolsoDe, setDesembolsoDe] = useState(null)
+  const [fechaDesembolso, setFechaDesembolso] = useState(() => new Date().toISOString().slice(0, 10))
 
   // Notas
   const [notasDe, setNotasDe] = useState(null)
@@ -90,12 +93,16 @@ export default function SolicitudesPage() {
     }
   }
 
-  const accionDesembolso = async (sol) => {
+  const accionDesembolso = async (sol, fecha) => {
     setSavingAction(`${sol.id}-desembolso`)
     setError(null)
     try {
-      await desembolsarSolicitud(sol.id, { observacion: 'Desembolso confirmado desde portal.' })
+      await desembolsarSolicitud(sol.id, {
+        observacion: 'Desembolso confirmado desde portal.',
+        fecha_desembolso: fecha,
+      })
       setOk(`${sol.numero_expediente} desembolsado y enviado a sync_outbox.`)
+      setDesembolsoDe(null)
       await listarSolicitudes().then((data) => setItems(data || []))
     } catch (err) {
       setError(extractError(err))
@@ -152,25 +159,33 @@ export default function SolicitudesPage() {
                     <td>{s.cliente_nombre}</td>
                     <td className="num"><Money value={s.monto_solicitado} /></td>
                     <td className="num">{s.monto_aprobado ? <Money value={s.monto_aprobado} /> : '—'}</td>
-                    <td><Badge estado={s.estado} /></td>
+                    <td><Badge estado={s.estado === 'rechazado' ? 'desaprobado' : s.estado} /></td>
                     <td>{formatDate(s.created_at)}</td>
                     <td>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                        {s.estado === 'recibido_comite' && (
-                          <>
-                            <button className="hb-btn hb-btn-sm" onClick={() => accionComite(s, 'aprobado')} disabled={!!savingAction}>
-                              <CheckCircle2 size={14} /> Aprobar
+                        {['enviado', 'recibido_comite', 'en_evaluacion'].includes(s.estado) && (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <select
+                              className="hb-select"
+                              aria-label={`Decisión para ${s.numero_expediente}`}
+                              value={decisionById[s.id] || 'aprobado'}
+                              onChange={(e) => setDecisionById((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                            >
+                              <option value="aprobado">Aprobado</option>
+                              <option value="desaprobado">Desaprobado</option>
+                              <option value="condicionado">Condicionado</option>
+                            </select>
+                            <button
+                              className="hb-btn hb-btn-sm"
+                              onClick={() => accionComite(s, decisionById[s.id] || 'aprobado')}
+                              disabled={!!savingAction}
+                            >
+                              <CheckCircle2 size={14} /> Aplicar
                             </button>
-                            <button className="hb-btn hb-btn-gray hb-btn-sm" onClick={() => accionComite(s, 'condicionado')} disabled={!!savingAction}>
-                              Condicionar
-                            </button>
-                            <button className="hb-btn hb-btn-ghost hb-btn-sm" onClick={() => accionComite(s, 'rechazado')} disabled={!!savingAction}>
-                              <XCircle size={14} /> Rechazar
-                            </button>
-                          </>
+                          </div>
                         )}
                         {['aprobado', 'condicionado'].includes(s.estado) && (
-                          <button className="hb-btn hb-btn-sm" onClick={() => accionDesembolso(s)} disabled={!!savingAction}>
+                          <button className="hb-btn hb-btn-sm" onClick={() => setDesembolsoDe(s)} disabled={!!savingAction}>
                             <HandCoins size={14} /> Desembolsar
                           </button>
                         )}
@@ -185,6 +200,33 @@ export default function SolicitudesPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {desembolsoDe && (
+        <Modal
+          title={`Desembolsar · ${desembolsoDe.numero_expediente}`}
+          icon={HandCoins}
+          onClose={() => setDesembolsoDe(null)}
+        >
+          <p>Selecciona la fecha efectiva del desembolso. Si eliges hoy, el abono aparecerá inmediatamente en App Clientes.</p>
+          <label className="hb-field">
+            <span>Fecha de desembolso</span>
+            <input
+              className="hb-input"
+              type="date"
+              value={fechaDesembolso}
+              onChange={(e) => setFechaDesembolso(e.target.value)}
+            />
+          </label>
+          <button
+            className="hb-btn"
+            style={{ marginTop: 14 }}
+            disabled={!fechaDesembolso || !!savingAction}
+            onClick={() => accionDesembolso(desembolsoDe, fechaDesembolso)}
+          >
+            <HandCoins size={15} /> Confirmar desembolso
+          </button>
+        </Modal>
       )}
 
       {notasDe && (
